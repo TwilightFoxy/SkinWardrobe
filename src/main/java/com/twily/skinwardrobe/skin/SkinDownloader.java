@@ -36,7 +36,7 @@ public final class SkinDownloader {
 
                 HttpRequest request = HttpRequest.newBuilder(downloadUri)
                         .timeout(Duration.ofSeconds(25))
-                        .header("User-Agent", "SkinWardrobe/0.7.0")
+                        .header("User-Agent", "SkinWardrobe/1.0.0")
                         .GET()
                         .build();
                 HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
@@ -77,7 +77,7 @@ public final class SkinDownloader {
                 + URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8);
         HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl))
                 .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "SkinWardrobe/0.7.0")
+                .header("User-Agent", "SkinWardrobe/1.0.0")
                 .GET()
                 .build();
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
@@ -97,7 +97,7 @@ public final class SkinDownloader {
     private static URI resolveElyBySkinUri(URI uri) throws IOException, InterruptedException, SkinRequestException {
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "SkinWardrobe/0.7.0")
+                .header("User-Agent", "SkinWardrobe/1.0.0")
                 .GET()
                 .build();
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());

@@ -30,7 +30,7 @@ public final class MineSkinClient {
                 SkinImageValidator.validate(pngBytes);
                 HttpRequest request = HttpRequest.newBuilder(GENERATE_URI)
                         .timeout(Duration.ofSeconds(45))
-                        .header("User-Agent", "SkinWardrobe/0.7.0")
+                        .header("User-Agent", "SkinWardrobe/1.0.0")
                         .header("Content-Type", "multipart/form-data; boundary=" + Multipart.BOUNDARY)
                         .POST(HttpRequest.BodyPublishers.ofByteArray(Multipart.skinUpload(pngBytes, model)))
                         .build();
