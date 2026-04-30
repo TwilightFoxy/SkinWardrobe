@@ -29,7 +29,7 @@ public final class SkinDownloader {
 
                 HttpRequest request = HttpRequest.newBuilder(uri)
                         .timeout(Duration.ofSeconds(25))
-                        .header("User-Agent", "SkinWardrobe/0.1.0")
+                        .header("User-Agent", "SkinWardrobe/0.2.0")
                         .GET()
                         .build();
                 HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());

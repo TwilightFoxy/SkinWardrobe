@@ -27,3 +27,10 @@ Local skins are signed through MineSkin and then sent to the server as signed te
 ## Notes
 
 Skin signing uses the public MineSkin API, so applying new skins depends on that service being available and not rate-limited.
+
+## Versioning
+
+- Major work or new features bump the second number, for example `0.2.0` -> `0.3.0`.
+- Bug fixes and small changes bump the third number, for example `0.2.0` -> `0.2.1`.
+- Versions can go past `0.10.0`, `0.20.0`, and so on.
+- `1.0.0` is reserved until the maintainer explicitly asks for it.
