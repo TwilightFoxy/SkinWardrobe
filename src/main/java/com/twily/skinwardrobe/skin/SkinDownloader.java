@@ -31,7 +31,7 @@ public final class SkinDownloader {
 
                 HttpRequest request = HttpRequest.newBuilder(downloadUri)
                         .timeout(Duration.ofSeconds(25))
-                        .header("User-Agent", "SkinWardrobe/0.3.0")
+                        .header("User-Agent", "SkinWardrobe/0.4.0")
                         .GET()
                         .build();
                 HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
@@ -63,7 +63,7 @@ public final class SkinDownloader {
                 + URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8);
         HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl))
                 .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "SkinWardrobe/0.3.0")
+                .header("User-Agent", "SkinWardrobe/0.4.0")
                 .GET()
                 .build();
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());

@@ -4,8 +4,11 @@ import com.google.gson.JsonObject;
 import com.twily.skinwardrobe.network.SkinWardrobeCommandPayload;
 import com.twily.skinwardrobe.skin.MineSkinClient;
 import com.twily.skinwardrobe.skin.SignedSkin;
+import com.twily.skinwardrobe.skin.SkinDownloader;
 import com.twily.skinwardrobe.skin.SkinModel;
 import com.twily.skinwardrobe.storage.WardrobeEntry;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +33,7 @@ public final class WardrobeScreen extends Screen {
     private final List<GallerySkin> gallerySkins = new ArrayList<>();
     private EditBox urlBox;
     private EditBox nameBox;
-    private SkinModel model = SkinModel.CLASSIC;
+    private SkinModel model = ClientWardrobeSettings.model();
     private int selectedIndex;
     private String status = "";
     private boolean syncRequested;
@@ -53,23 +56,16 @@ public final class WardrobeScreen extends Screen {
         clampSelection();
         this.clearWidgets();
 
-        int panelWidth = Math.min(600, this.width - 24);
-        int panelHeight = Math.min(330, this.height - 24);
-        int left = (this.width - panelWidth) / 2;
-        int top = Math.max(12, (this.height - panelHeight) / 2);
-        int bottom = top + panelHeight;
-        int fieldWidth = panelWidth - 170;
-        int previewSize = Math.max(132, Math.min(190, panelHeight - 142));
-        int previewX = left + (panelWidth - previewSize) / 2;
-        int previewY = top + 94;
+        Layout layout = layout();
+        int fieldWidth = layout.panelWidth - 198;
 
-        this.urlBox = new EditBox(this.font, left + 14, top + 34, fieldWidth, 20, Component.translatable("screen.skinwardrobe.url"));
+        this.urlBox = new EditBox(this.font, layout.left + 14, layout.top + 34, fieldWidth, 20, Component.translatable("screen.skinwardrobe.url"));
         this.urlBox.setMaxLength(2048);
         this.urlBox.setValue(urlValue);
         this.urlBox.setHint(Component.translatable("screen.skinwardrobe.url.hint"));
         this.addRenderableWidget(this.urlBox);
 
-        this.nameBox = new EditBox(this.font, left + 14, top + 62, fieldWidth, 20, Component.translatable("screen.skinwardrobe.name"));
+        this.nameBox = new EditBox(this.font, layout.left + 14, layout.top + 62, fieldWidth, 20, Component.translatable("screen.skinwardrobe.name"));
         this.nameBox.setMaxLength(32);
         this.nameBox.setValue(nameValue);
         this.nameBox.setHint(Component.translatable("screen.skinwardrobe.name.hint"));
@@ -77,51 +73,37 @@ public final class WardrobeScreen extends Screen {
 
         this.addRenderableWidget(CycleButton.builder(value -> Component.translatable("screen.skinwardrobe.model." + value.id()), this.model)
                 .withValues(SkinModel.CLASSIC, SkinModel.SLIM)
-                .create(left + panelWidth - 142, top + 34, 128, 20, Component.translatable("screen.skinwardrobe.model"), (button, value) -> this.model = value));
+                .create(layout.left + layout.panelWidth - 168, layout.top + 34, 154, 20, Component.translatable("screen.skinwardrobe.model"), (button, value) -> {
+                    this.model = value;
+                    ClientWardrobeSettings.setModel(value);
+                    this.rebuildWidgets();
+                }));
 
         this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.apply_url"), button -> applyUrl(false))
-                .bounds(left + panelWidth - 142, top + 62, 62, 20)
+                .bounds(layout.left + layout.panelWidth - 168, layout.top + 62, 76, 20)
                 .build());
         this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.save_url"), button -> applyUrl(true))
-                .bounds(left + panelWidth - 76, top + 62, 62, 20)
+                .bounds(layout.left + layout.panelWidth - 88, layout.top + 62, 74, 20)
                 .build());
 
-        PlayerSkinWidget preview = new PlayerSkinWidget(previewSize, previewSize, Minecraft.getInstance().getEntityModels(), this::selectedPreviewSkin);
-        preview.setX(previewX);
-        preview.setY(previewY);
-        this.addRenderableWidget(preview);
+        addCarouselWidgets(layout);
 
-        Button previous = this.addRenderableWidget(Button.builder(Component.literal("<"), button -> selectPrevious())
-                .bounds(previewX - 42, previewY + previewSize / 2 - 10, 30, 20)
-                .build());
-        previous.active = this.gallerySkins.size() > 1;
-
-        Button next = this.addRenderableWidget(Button.builder(Component.literal(">"), button -> selectNext())
-                .bounds(previewX + previewSize + 12, previewY + previewSize / 2 - 10, 30, 20)
-                .build());
-        next.active = this.gallerySkins.size() > 1;
-
-        int actionY = bottom - 58;
-        Button apply = this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.install"), button -> applySelected(false))
-                .bounds(left + panelWidth / 2 - 96, actionY, 60, 20)
+        int actionY = layout.bottom - 58;
+        Button apply = this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.install"), button -> applySelected())
+                .bounds(layout.centerX - 66, actionY, 62, 20)
                 .build());
         apply.active = selected() != null;
 
-        Button save = this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.save_selected"), button -> applySelected(true))
-                .bounds(left + panelWidth / 2 - 32, actionY, 64, 20)
-                .build());
-        save.active = selected() != null && selected().local() != null;
-
         Button delete = this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.delete"), button -> deleteSelected())
-                .bounds(left + panelWidth / 2 + 36, actionY, 60, 20)
+                .bounds(layout.centerX + 4, actionY, 62, 20)
                 .build());
         delete.active = selected() != null && selected().saved() != null;
 
         this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.reset"), button -> send("reset", "{}"))
-                .bounds(left + panelWidth - 142, bottom - 28, 62, 20)
+                .bounds(layout.left + layout.panelWidth - 168, layout.bottom - 28, 76, 20)
                 .build());
         this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> this.minecraft.setScreen(this.parent))
-                .bounds(left + panelWidth - 76, bottom - 28, 62, 20)
+                .bounds(layout.left + layout.panelWidth - 88, layout.bottom - 28, 74, 20)
                 .build());
 
         if (urlFocused) {
@@ -145,40 +127,99 @@ public final class WardrobeScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        int panelWidth = Math.min(600, this.width - 24);
-        int panelHeight = Math.min(330, this.height - 24);
-        int left = (this.width - panelWidth) / 2;
-        int top = Math.max(12, (this.height - panelHeight) / 2);
-        int bottom = top + panelHeight;
-        int previewSize = Math.max(132, Math.min(190, panelHeight - 142));
-        int previewX = left + (panelWidth - previewSize) / 2;
-        int previewY = top + 94;
+        Layout layout = layout();
+        graphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.bottom, 0xE0101010);
+        graphics.outline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, 0xFF777777);
+        drawCarouselFrames(graphics, layout);
 
-        graphics.fill(left, top, left + panelWidth, bottom, 0xE0101010);
-        graphics.outline(left, top, panelWidth, panelHeight, 0xFF777777);
-        graphics.fill(previewX - 8, previewY - 8, previewX + previewSize + 8, previewY + previewSize + 8, 0x70202020);
-        graphics.outline(previewX - 8, previewY - 8, previewSize + 16, previewSize + 16, 0xFF505050);
-        graphics.centeredText(this.font, TITLE, this.width / 2, top + 12, 0xFFFFFFFF);
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+
+        drawCarouselOverlays(graphics, layout);
+        graphics.centeredText(this.font, TITLE, this.width / 2, layout.top + 12, 0xFFFFFFFF);
 
         GallerySkin selected = selected();
+        int textY = layout.previewY + layout.previewSize + 16;
         if (selected == null) {
-            graphics.centeredText(this.font, Component.translatable("screen.skinwardrobe.gallery.empty"), this.width / 2, previewY + previewSize + 14, 0xFFFFE08A);
+            graphics.centeredText(this.font, Component.translatable("screen.skinwardrobe.gallery.empty"), this.width / 2, textY, 0xFFFFE08A);
         } else {
-            graphics.centeredText(this.font, Component.literal(selected.name()), this.width / 2, previewY + previewSize + 12, 0xFFFFFFFF);
-            graphics.centeredText(this.font, selected.sourceLabel(), this.width / 2, previewY + previewSize + 24, 0xFFBDBDBD);
-            graphics.centeredText(this.font, Component.literal((this.selectedIndex + 1) + " / " + this.gallerySkins.size()), this.width / 2, top + 84, 0xFFA0A0A0);
+            graphics.centeredText(this.font, Component.literal(selected.name()), this.width / 2, textY, 0xFFFFFFFF);
+            graphics.centeredText(this.font, selected.sourceLabel(), this.width / 2, textY + 12, 0xFFBDBDBD);
+            graphics.centeredText(this.font, Component.literal((this.selectedIndex + 1) + " / " + this.gallerySkins.size()), this.width / 2, layout.previewY - 16, 0xFFA0A0A0);
         }
 
         WardrobeEntry active = ClientWardrobeState.wardrobe().active;
         String activeText = active == null
                 ? Component.translatable("screen.skinwardrobe.active.none").getString()
                 : Component.translatable("screen.skinwardrobe.active", active.name).getString();
-        graphics.text(this.font, activeText, left + 14, bottom - 24, 0xFFB8FFB8);
+        graphics.text(this.font, activeText, layout.left + 14, layout.bottom - 24, 0xFFB8FFB8);
         if (!this.status.isBlank()) {
-            graphics.text(this.font, this.status, left + 14, bottom - 12, 0xFFFFE08A);
+            graphics.text(this.font, this.status, layout.left + 14, layout.bottom - 12, 0xFFFFE08A);
+        }
+    }
+
+    private void addCarouselWidgets(Layout layout) {
+        for (PreviewSlot slot : previewSlots(layout)) {
+            PlayerSkinWidget preview = new PlayerSkinWidget(slot.size, slot.size, Minecraft.getInstance().getEntityModels(), () -> previewSkinAtOffset(slot.offset));
+            preview.setX(slot.x);
+            preview.setY(slot.y);
+            this.addRenderableWidget(preview);
         }
 
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        Button previous = this.addRenderableWidget(Button.builder(Component.literal("<"), button -> selectPrevious())
+                .bounds(layout.centerX - layout.previewSize / 2 - 36, layout.previewY + layout.previewSize / 2 - 10, 28, 20)
+                .build());
+        previous.active = this.gallerySkins.size() > 1;
+
+        Button next = this.addRenderableWidget(Button.builder(Component.literal(">"), button -> selectNext())
+                .bounds(layout.centerX + layout.previewSize / 2 + 8, layout.previewY + layout.previewSize / 2 - 10, 28, 20)
+                .build());
+        next.active = this.gallerySkins.size() > 1;
+    }
+
+    private void drawCarouselFrames(GuiGraphicsExtractor graphics, Layout layout) {
+        for (PreviewSlot slot : previewSlots(layout)) {
+            int padding = slot.offset == 0 ? 8 : 5;
+            int color = slot.offset == 0 ? 0xFF606060 : 0xFF3E3E3E;
+            graphics.fill(slot.x - padding, slot.y - padding, slot.x + slot.size + padding, slot.y + slot.size + padding, 0x70202020);
+            graphics.outline(slot.x - padding, slot.y - padding, slot.size + padding * 2, slot.size + padding * 2, color);
+        }
+    }
+
+    private void drawCarouselOverlays(GuiGraphicsExtractor graphics, Layout layout) {
+        for (PreviewSlot slot : previewSlots(layout)) {
+            if (slot.offset != 0) {
+                graphics.fill(slot.x - 1, slot.y - 1, slot.x + slot.size + 1, slot.y + slot.size + 1, 0x78000000);
+            }
+        }
+    }
+
+    private List<PreviewSlot> previewSlots(Layout layout) {
+        List<PreviewSlot> slots = new ArrayList<>();
+        int count = this.gallerySkins.size();
+        if (count == 0) {
+            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
+            return slots;
+        }
+
+        int sideSize = Math.max(112, layout.previewSize * 3 / 5);
+        int farSize = Math.max(82, layout.previewSize * 2 / 5);
+        if (count >= 5 && layout.panelWidth >= 820) {
+            slots.add(new PreviewSlot(-2, layout.centerX - layout.previewSize / 2 - sideSize - farSize - 78, layout.previewY + (layout.previewSize - farSize) / 2, farSize));
+            slots.add(new PreviewSlot(-1, layout.centerX - layout.previewSize / 2 - sideSize - 38, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
+            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
+            slots.add(new PreviewSlot(1, layout.centerX + layout.previewSize / 2 + 38, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
+            slots.add(new PreviewSlot(2, layout.centerX + layout.previewSize / 2 + sideSize + 78, layout.previewY + (layout.previewSize - farSize) / 2, farSize));
+        } else if (count >= 3) {
+            slots.add(new PreviewSlot(-1, layout.centerX - layout.previewSize / 2 - sideSize - 42, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
+            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
+            slots.add(new PreviewSlot(1, layout.centerX + layout.previewSize / 2 + 42, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
+        } else if (count == 2) {
+            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
+            slots.add(new PreviewSlot(1, layout.centerX + layout.previewSize / 2 + 42, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
+        } else {
+            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
+        }
+        return slots;
     }
 
     private void rebuildGallery() {
@@ -217,13 +258,13 @@ public final class WardrobeScreen extends Screen {
         }
     }
 
-    private void applySelected(boolean save) {
+    private void applySelected() {
         GallerySkin selected = selected();
         if (selected == null) {
             return;
         }
         if (selected.local() != null) {
-            applyLocal(selected.local(), save);
+            applyLocal(selected.local());
         } else if (selected.saved() != null) {
             send("use", nameJson(selected.saved().name));
         }
@@ -237,16 +278,28 @@ public final class WardrobeScreen extends Screen {
     }
 
     private void applyUrl(boolean save) {
-        JsonObject json = new JsonObject();
-        json.addProperty("url", this.urlBox.getValue());
-        json.addProperty("model", this.model.id());
-        json.addProperty("save", save);
-        json.addProperty("name", this.nameBox.getValue().isBlank() ? "URL skin" : this.nameBox.getValue());
-        send("set_url", json.toString());
+        String url = this.urlBox.getValue();
+        String name = this.nameBox.getValue().isBlank() ? "URL skin" : this.nameBox.getValue();
+        SkinModel selectedModel = this.model;
         this.status = Component.translatable("skinwardrobe.status.working").getString();
+        SkinDownloader.downloadPng(url)
+                .thenCompose(bytes -> MineSkinClient.sign(bytes, selectedModel).thenApply(signedSkin -> new DownloadedSkin(bytes, signedSkin)))
+                .whenComplete((downloaded, throwable) -> Minecraft.getInstance().execute(() -> {
+                    if (throwable != null) {
+                        this.status = MineSkinClient.unwrap(throwable).getMessage();
+                        return;
+                    }
+                    try {
+                        Path savedPath = LocalSkinScanner.saveDownloaded(name, downloaded.bytes());
+                        sendSigned(name, selectedModel, "url", url, downloaded.signedSkin(), save);
+                        refreshLocalSelection(savedPath);
+                    } catch (IOException | IllegalArgumentException e) {
+                        this.status = e.getMessage();
+                    }
+                }));
     }
 
-    private void applyLocal(LocalSkinScanner.LocalSkin skin, boolean save) {
+    private void applyLocal(LocalSkinScanner.LocalSkin skin) {
         this.status = Component.translatable("skinwardrobe.status.working").getString();
         SkinModel selectedModel = this.model;
         MineSkinClient.sign(skin.bytes(), selectedModel).whenComplete((signedSkin, throwable) -> {
@@ -256,34 +309,59 @@ public final class WardrobeScreen extends Screen {
                     this.status = MineSkinClient.unwrap(throwable).getMessage();
                     return;
                 }
-                sendSigned(skin, selectedModel, signedSkin, save);
+                String name = this.nameBox.getValue().isBlank() ? skin.name() : this.nameBox.getValue();
+                sendSigned(name, selectedModel, "local", skin.path().getFileName().toString(), signedSkin, false);
             });
         });
     }
 
-    private void sendSigned(LocalSkinScanner.LocalSkin skin, SkinModel model, SignedSkin signedSkin, boolean save) {
+    private void sendSigned(String name, SkinModel model, String sourceType, String source, SignedSkin signedSkin, boolean save) {
         JsonObject json = new JsonObject();
-        json.addProperty("name", this.nameBox.getValue().isBlank() ? skin.name() : this.nameBox.getValue());
+        json.addProperty("name", name);
         json.addProperty("model", model.id());
-        json.addProperty("sourceType", "local");
-        json.addProperty("source", skin.path().getFileName().toString());
+        json.addProperty("sourceType", sourceType);
+        json.addProperty("source", source);
         json.addProperty("value", signedSkin.value());
         json.addProperty("signature", signedSkin.signature());
         json.addProperty("save", save);
         send("set_signed", json.toString());
     }
 
+    private void refreshLocalSelection(Path selectedPath) {
+        this.localSkins.clear();
+        this.localSkins.addAll(LocalSkinScanner.scan());
+        rebuildGallery();
+        for (int i = 0; i < this.gallerySkins.size(); i++) {
+            LocalSkinScanner.LocalSkin local = this.gallerySkins.get(i).local();
+            if (local != null && local.path().equals(selectedPath)) {
+                this.selectedIndex = i;
+                break;
+            }
+        }
+        updateNameFromSelection();
+        this.rebuildWidgets();
+    }
+
     private PlayerSkin selectedPreviewSkin() {
-        GallerySkin selected = selected();
+        return previewSkinAtOffset(0);
+    }
+
+    private PlayerSkin previewSkinAtOffset(int offset) {
+        GallerySkin selected = selectedAtOffset(offset);
         return selected == null ? DefaultPlayerSkin.getDefaultSkin() : selected.preview().get();
     }
 
     private @Nullable GallerySkin selected() {
+        return selectedAtOffset(0);
+    }
+
+    private @Nullable GallerySkin selectedAtOffset(int offset) {
         if (this.gallerySkins.isEmpty()) {
             return null;
         }
         clampSelection();
-        return this.gallerySkins.get(this.selectedIndex);
+        int index = Math.floorMod(this.selectedIndex + offset, this.gallerySkins.size());
+        return this.gallerySkins.get(index);
     }
 
     private void clampSelection() {
@@ -296,6 +374,18 @@ public final class WardrobeScreen extends Screen {
         }
     }
 
+    private Layout layout() {
+        int panelWidth = Math.min(860, this.width - 24);
+        int panelHeight = Math.min(410, this.height - 24);
+        int left = (this.width - panelWidth) / 2;
+        int top = Math.max(12, (this.height - panelHeight) / 2);
+        int bottom = top + panelHeight;
+        int previewSize = Math.max(168, Math.min(214, panelHeight - 196));
+        int centerX = left + panelWidth / 2;
+        int previewY = top + 118;
+        return new Layout(panelWidth, panelHeight, left, top, bottom, centerX, previewY, previewSize);
+    }
+
     private static String nameJson(String name) {
         JsonObject json = new JsonObject();
         json.addProperty("name", name);
@@ -306,6 +396,15 @@ public final class WardrobeScreen extends Screen {
         if (Minecraft.getInstance().getConnection() != null) {
             ClientPacketDistributor.sendToServer(new SkinWardrobeCommandPayload(action, json));
         }
+    }
+
+    private record Layout(int panelWidth, int panelHeight, int left, int top, int bottom, int centerX, int previewY, int previewSize) {
+    }
+
+    private record PreviewSlot(int offset, int x, int y, int size) {
+    }
+
+    private record DownloadedSkin(byte[] bytes, SignedSkin signedSkin) {
     }
 
     private record GallerySkin(

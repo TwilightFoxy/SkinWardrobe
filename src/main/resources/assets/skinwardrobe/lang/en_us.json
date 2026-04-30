@@ -19,7 +19,7 @@
   "screen.skinwardrobe.reset": "Reset",
   "screen.skinwardrobe.saved": "Saved skins",
   "screen.skinwardrobe.local": "Local folder skins",
-  "screen.skinwardrobe.gallery.empty": "Save a skin or add PNG files to skinwardrobe/skins",
+  "screen.skinwardrobe.gallery.empty": "Save a skin or add PNG files to skinwardrobe",
   "screen.skinwardrobe.source.local": "Local PNG",
   "screen.skinwardrobe.source.saved": "Saved wardrobe skin",
   "screen.skinwardrobe.active": "Active: %s",
