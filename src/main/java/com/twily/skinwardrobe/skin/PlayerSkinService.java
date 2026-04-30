@@ -27,7 +27,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 public final class PlayerSkinService {
     private static final String DEFAULT_TEXTURES_KEY = "skinwardrobe-default_textures";
     private static final Map<UUID, Long> LAST_SIGNED_APPLY = new ConcurrentHashMap<>();
-    private static final long RATE_LIMIT_MILLIS = 15_000L;
+    private static final long RATE_LIMIT_MILLIS = 3_000L;
     private static final Field GAME_PROFILE_FIELD = findGameProfileField();
     private static final Field CHUNK_MAP_ENTITY_MAP = findField(ChunkMap.class, "entityMap");
     private static final Field TRACKED_ENTITY_SERVER_ENTITY = findTrackedEntityServerEntityField();

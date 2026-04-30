@@ -28,13 +28,18 @@ import org.jetbrains.annotations.Nullable;
 
 public final class WardrobeScreen extends Screen {
     private static final Component TITLE = Component.translatable("screen.skinwardrobe.title");
+    private static final long CAROUSEL_ANIMATION_MILLIS = 180L;
     private final @Nullable Screen parent;
     private final List<LocalSkinScanner.LocalSkin> localSkins = new ArrayList<>();
     private final List<GallerySkin> gallerySkins = new ArrayList<>();
+    private final List<PreviewWidget> previewWidgets = new ArrayList<>();
     private EditBox urlBox;
     private EditBox nameBox;
     private SkinModel model = ClientWardrobeSettings.model();
     private int selectedIndex;
+    private int animationFromIndex;
+    private int animationDirection;
+    private long animationStartedAt;
     private String status = "";
     private boolean syncRequested;
 
@@ -88,7 +93,7 @@ public final class WardrobeScreen extends Screen {
 
         addCarouselWidgets(layout);
 
-        int actionY = layout.bottom - 58;
+        int actionY = layout.bottom - 74;
         Button apply = this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.install"), button -> applySelected())
                 .bounds(layout.centerX - 66, actionY, 62, 20)
                 .build());
@@ -128,6 +133,8 @@ public final class WardrobeScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = layout();
+        updateCarouselAnimation();
+        updatePreviewWidgetPositions(layout);
         graphics.fill(layout.left, layout.top, layout.left + layout.panelWidth, layout.bottom, 0xE0101010);
         graphics.outline(layout.left, layout.top, layout.panelWidth, layout.panelHeight, 0xFF777777);
         drawCarouselFrames(graphics, layout);
@@ -138,7 +145,7 @@ public final class WardrobeScreen extends Screen {
         graphics.centeredText(this.font, TITLE, this.width / 2, layout.top + 12, 0xFFFFFFFF);
 
         GallerySkin selected = selected();
-        int textY = layout.previewY + layout.previewSize + 16;
+        int textY = layout.previewY + layout.previewSize + 12;
         if (selected == null) {
             graphics.centeredText(this.font, Component.translatable("screen.skinwardrobe.gallery.empty"), this.width / 2, textY, 0xFFFFE08A);
         } else {
@@ -158,11 +165,13 @@ public final class WardrobeScreen extends Screen {
     }
 
     private void addCarouselWidgets(Layout layout) {
+        this.previewWidgets.clear();
         for (PreviewSlot slot : previewSlots(layout)) {
             PlayerSkinWidget preview = new PlayerSkinWidget(slot.size, slot.size, Minecraft.getInstance().getEntityModels(), () -> previewSkinAtOffset(slot.offset));
             preview.setX(slot.x);
             preview.setY(slot.y);
             this.addRenderableWidget(preview);
+            this.previewWidgets.add(new PreviewWidget(slot.offset, preview));
         }
 
         Button previous = this.addRenderableWidget(Button.builder(Component.literal("<"), button -> selectPrevious())
@@ -178,6 +187,7 @@ public final class WardrobeScreen extends Screen {
 
     private void drawCarouselFrames(GuiGraphicsExtractor graphics, Layout layout) {
         for (PreviewSlot slot : previewSlots(layout)) {
+            slot = animatedSlot(layout, slot.offset);
             int padding = slot.offset == 0 ? 8 : 5;
             int color = slot.offset == 0 ? 0xFF606060 : 0xFF3E3E3E;
             graphics.fill(slot.x - padding, slot.y - padding, slot.x + slot.size + padding, slot.y + slot.size + padding, 0x70202020);
@@ -187,10 +197,70 @@ public final class WardrobeScreen extends Screen {
 
     private void drawCarouselOverlays(GuiGraphicsExtractor graphics, Layout layout) {
         for (PreviewSlot slot : previewSlots(layout)) {
+            slot = animatedSlot(layout, slot.offset);
             if (slot.offset != 0) {
                 graphics.fill(slot.x - 1, slot.y - 1, slot.x + slot.size + 1, slot.y + slot.size + 1, 0x78000000);
             }
         }
+    }
+
+    private void updatePreviewWidgetPositions(Layout layout) {
+        for (PreviewWidget preview : this.previewWidgets) {
+            PreviewSlot slot = animatedSlot(layout, preview.offset());
+            preview.widget().setX(slot.x());
+            preview.widget().setY(slot.y());
+        }
+    }
+
+    private PreviewSlot animatedSlot(Layout layout, int offset) {
+        PreviewSlot current = slotForOffset(layout, offset);
+        if (!isAnimating()) {
+            return current;
+        }
+        float progress = animationProgress();
+        PreviewSlot target = slotForOffset(layout, offset - this.animationDirection);
+        int x = lerp(current.x(), target.x(), progress);
+        int y = lerp(current.y(), target.y(), progress);
+        int size = lerp(current.size(), target.size(), progress);
+        return new PreviewSlot(offset, x, y, size);
+    }
+
+    private PreviewSlot slotForOffset(Layout layout, int offset) {
+        int sideSize = Math.max(112, layout.previewSize * 3 / 5);
+        int farSize = Math.max(82, layout.previewSize * 2 / 5);
+        return switch (offset) {
+            case -3 -> new PreviewSlot(offset, layout.left - farSize, layout.previewY + (layout.previewSize - farSize) / 2, farSize);
+            case -2 -> new PreviewSlot(offset, layout.centerX - layout.previewSize / 2 - sideSize - farSize - 78, layout.previewY + (layout.previewSize - farSize) / 2, farSize);
+            case -1 -> new PreviewSlot(offset, layout.centerX - layout.previewSize / 2 - sideSize - 38, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize);
+            case 0 -> new PreviewSlot(offset, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize);
+            case 1 -> new PreviewSlot(offset, layout.centerX + layout.previewSize / 2 + 38, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize);
+            case 2 -> new PreviewSlot(offset, layout.centerX + layout.previewSize / 2 + sideSize + 78, layout.previewY + (layout.previewSize - farSize) / 2, farSize);
+            case 3 -> new PreviewSlot(offset, layout.left + layout.panelWidth, layout.previewY + (layout.previewSize - farSize) / 2, farSize);
+            default -> new PreviewSlot(offset, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize);
+        };
+    }
+
+    private boolean isAnimating() {
+        return this.animationDirection != 0;
+    }
+
+    private float animationProgress() {
+        if (!isAnimating()) {
+            return 0.0F;
+        }
+        long elapsed = System.currentTimeMillis() - this.animationStartedAt;
+        return Math.min(1.0F, elapsed / (float) CAROUSEL_ANIMATION_MILLIS);
+    }
+
+    private void updateCarouselAnimation() {
+        if (isAnimating() && animationProgress() >= 1.0F) {
+            this.animationDirection = 0;
+        }
+    }
+
+    private static int lerp(int from, int to, float progress) {
+        float eased = 1.0F - (1.0F - progress) * (1.0F - progress);
+        return Math.round(from + (to - from) * eased);
     }
 
     private List<PreviewSlot> previewSlots(Layout layout) {
@@ -204,20 +274,20 @@ public final class WardrobeScreen extends Screen {
         int sideSize = Math.max(112, layout.previewSize * 3 / 5);
         int farSize = Math.max(82, layout.previewSize * 2 / 5);
         if (count >= 5 && layout.panelWidth >= 820) {
-            slots.add(new PreviewSlot(-2, layout.centerX - layout.previewSize / 2 - sideSize - farSize - 78, layout.previewY + (layout.previewSize - farSize) / 2, farSize));
-            slots.add(new PreviewSlot(-1, layout.centerX - layout.previewSize / 2 - sideSize - 38, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
-            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
-            slots.add(new PreviewSlot(1, layout.centerX + layout.previewSize / 2 + 38, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
-            slots.add(new PreviewSlot(2, layout.centerX + layout.previewSize / 2 + sideSize + 78, layout.previewY + (layout.previewSize - farSize) / 2, farSize));
+            slots.add(slotForOffset(layout, -2));
+            slots.add(slotForOffset(layout, -1));
+            slots.add(slotForOffset(layout, 0));
+            slots.add(slotForOffset(layout, 1));
+            slots.add(slotForOffset(layout, 2));
         } else if (count >= 3) {
-            slots.add(new PreviewSlot(-1, layout.centerX - layout.previewSize / 2 - sideSize - 42, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
-            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
-            slots.add(new PreviewSlot(1, layout.centerX + layout.previewSize / 2 + 42, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
+            slots.add(slotForOffset(layout, -1));
+            slots.add(slotForOffset(layout, 0));
+            slots.add(slotForOffset(layout, 1));
         } else if (count == 2) {
-            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
-            slots.add(new PreviewSlot(1, layout.centerX + layout.previewSize / 2 + 42, layout.previewY + (layout.previewSize - sideSize) / 2, sideSize));
+            slots.add(slotForOffset(layout, 0));
+            slots.add(slotForOffset(layout, 1));
         } else {
-            slots.add(new PreviewSlot(0, layout.centerX - layout.previewSize / 2, layout.previewY, layout.previewSize));
+            slots.add(slotForOffset(layout, 0));
         }
         return slots;
     }
@@ -237,18 +307,24 @@ public final class WardrobeScreen extends Screen {
         if (this.gallerySkins.isEmpty()) {
             return;
         }
+        startAnimation(-1);
         this.selectedIndex = (this.selectedIndex - 1 + this.gallerySkins.size()) % this.gallerySkins.size();
         updateNameFromSelection();
-        this.rebuildWidgets();
     }
 
     private void selectNext() {
         if (this.gallerySkins.isEmpty()) {
             return;
         }
+        startAnimation(1);
         this.selectedIndex = (this.selectedIndex + 1) % this.gallerySkins.size();
         updateNameFromSelection();
-        this.rebuildWidgets();
+    }
+
+    private void startAnimation(int direction) {
+        this.animationFromIndex = this.selectedIndex;
+        this.animationDirection = direction;
+        this.animationStartedAt = System.currentTimeMillis();
     }
 
     private void updateNameFromSelection() {
@@ -360,7 +436,8 @@ public final class WardrobeScreen extends Screen {
             return null;
         }
         clampSelection();
-        int index = Math.floorMod(this.selectedIndex + offset, this.gallerySkins.size());
+        int baseIndex = isAnimating() ? this.animationFromIndex : this.selectedIndex;
+        int index = Math.floorMod(baseIndex + offset, this.gallerySkins.size());
         return this.gallerySkins.get(index);
     }
 
@@ -376,11 +453,11 @@ public final class WardrobeScreen extends Screen {
 
     private Layout layout() {
         int panelWidth = Math.min(860, this.width - 24);
-        int panelHeight = Math.min(410, this.height - 24);
+        int panelHeight = Math.min(450, this.height - 24);
         int left = (this.width - panelWidth) / 2;
         int top = Math.max(12, (this.height - panelHeight) / 2);
         int bottom = top + panelHeight;
-        int previewSize = Math.max(168, Math.min(214, panelHeight - 196));
+        int previewSize = Math.max(150, Math.min(198, panelHeight - 240));
         int centerX = left + panelWidth / 2;
         int previewY = top + 118;
         return new Layout(panelWidth, panelHeight, left, top, bottom, centerX, previewY, previewSize);
@@ -402,6 +479,9 @@ public final class WardrobeScreen extends Screen {
     }
 
     private record PreviewSlot(int offset, int x, int y, int size) {
+    }
+
+    private record PreviewWidget(int offset, PlayerSkinWidget widget) {
     }
 
     private record DownloadedSkin(byte[] bytes, SignedSkin signedSkin) {
