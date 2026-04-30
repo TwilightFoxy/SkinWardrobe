@@ -36,7 +36,7 @@ public final class SkinDownloader {
 
                 HttpRequest request = HttpRequest.newBuilder(downloadUri)
                         .timeout(Duration.ofSeconds(25))
-                        .header("User-Agent", "SkinWardrobe/0.6.0")
+                        .header("User-Agent", "SkinWardrobe/0.7.0")
                         .GET()
                         .build();
                 HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
@@ -66,6 +66,9 @@ public final class SkinDownloader {
         if (isElyBySkinPageUrl(uri)) {
             return resolveElyBySkinUri(uri);
         }
+        if (isNameMcSkinPageUrl(uri)) {
+            return resolveNameMcSkinUri(uri);
+        }
         return uri;
     }
 
@@ -74,7 +77,7 @@ public final class SkinDownloader {
                 + URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8);
         HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl))
                 .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "SkinWardrobe/0.6.0")
+                .header("User-Agent", "SkinWardrobe/0.7.0")
                 .GET()
                 .build();
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
@@ -94,7 +97,7 @@ public final class SkinDownloader {
     private static URI resolveElyBySkinUri(URI uri) throws IOException, InterruptedException, SkinRequestException {
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "SkinWardrobe/0.6.0")
+                .header("User-Agent", "SkinWardrobe/0.7.0")
                 .GET()
                 .build();
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
@@ -120,6 +123,19 @@ public final class SkinDownloader {
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
         String path = uri.getPath() == null ? "" : uri.getPath().toLowerCase(Locale.ROOT);
         return (host.equals("ely.by") || host.equals("www.ely.by")) && path.matches("/skins/s\\d+");
+    }
+
+    private static boolean isNameMcSkinPageUrl(URI uri) {
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        String path = uri.getPath() == null ? "" : uri.getPath().toLowerCase(Locale.ROOT);
+        return (host.equals("namemc.com") || host.endsWith(".namemc.com")) && path.matches("/skin/[a-f0-9]+");
+    }
+
+    private static URI resolveNameMcSkinUri(URI uri) throws SkinRequestException {
+        String id = uri.getPath().substring("/skin/".length());
+        URI downloadUri = URI.create("https://s.namemc.com/i/" + id + ".png");
+        validateHttpUri(downloadUri);
+        return downloadUri;
     }
 
     private static void validateHttpUri(URI uri) throws SkinRequestException {

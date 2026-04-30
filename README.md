@@ -6,11 +6,12 @@ Skin Wardrobe is a NeoForge 26.1 mod for changing player skins on a server. It w
 
 ### What links work?
 
-Skin Wardrobe accepts direct Minecraft skin PNG files sized `64x64`. Public Yandex Disk image links and Ely.by skin pages are supported too, for example links like:
+Skin Wardrobe accepts direct Minecraft skin PNG files sized `64x64`. Public Yandex Disk image links, Ely.by skin pages, and NameMC skin pages are supported too, for example links like:
 
 ```text
 https://disk.yandex.ru/i/...
 https://ely.by/skins/s3512393
+https://namemc.com/skin/6e8a6d2c80f9e54b
 ```
 
 The final image must still be a valid Minecraft skin PNG. If the image is a screenshot, preview image, or a non-`64x64` picture, the mod will reject it.
@@ -41,11 +42,12 @@ Skin signing uses the public MineSkin API, so applying new skins depends on that
 
 ### Какие ссылки подходят?
 
-Skin Wardrobe принимает ссылки на PNG-скины Minecraft размером `64x64`. Публичные ссылки Яндекс.Диска и страницы скинов Ely.by тоже поддерживаются, например:
+Skin Wardrobe принимает ссылки на PNG-скины Minecraft размером `64x64`. Публичные ссылки Яндекс.Диска, страницы скинов Ely.by и NameMC тоже поддерживаются, например:
 
 ```text
 https://disk.yandex.ru/i/...
 https://ely.by/skins/s3512393
+https://namemc.com/skin/6e8a6d2c80f9e54b
 ```
 
 Итоговая картинка должна быть валидным PNG-скином Minecraft. Если это скриншот, превью или картинка не `64x64`, мод ее отклонит.

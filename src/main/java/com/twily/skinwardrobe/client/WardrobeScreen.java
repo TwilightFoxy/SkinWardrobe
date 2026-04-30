@@ -301,11 +301,29 @@ public final class WardrobeScreen extends Screen {
         this.gallerySkins.clear();
         for (Map.Entry<String, WardrobeEntry> entry : ClientWardrobeState.wardrobe().entries.entrySet()) {
             WardrobeEntry value = entry.getValue();
-            this.gallerySkins.add(GallerySkin.saved(entry.getKey(), value, ClientSkinPreview.saved(value)));
+            if (!hasLocalCopy(value)) {
+                this.gallerySkins.add(GallerySkin.saved(entry.getKey(), value, ClientSkinPreview.saved(value)));
+            }
         }
         for (LocalSkinScanner.LocalSkin skin : this.localSkins) {
             this.gallerySkins.add(GallerySkin.local(skin, () -> ClientSkinPreview.localSkin(skin, this.model)));
         }
+    }
+
+    private boolean hasLocalCopy(WardrobeEntry entry) {
+        if (entry == null || entry.sourceType == null) {
+            return false;
+        }
+        if (!entry.sourceType.equals("local") && !entry.sourceType.equals("url")) {
+            return false;
+        }
+        for (LocalSkinScanner.LocalSkin local : this.localSkins) {
+            String fileName = local.path().getFileName().toString();
+            if (equalsText(fileName, entry.source) || equalsText(local.name(), entry.name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void selectPrevious() {
@@ -406,7 +424,7 @@ public final class WardrobeScreen extends Screen {
                     }
                     try {
                         Path savedPath = LocalSkinScanner.saveDownloaded(name, downloaded.bytes());
-                        sendSigned(name, selectedModel, "url", url, downloaded.signedSkin(), save);
+                        sendSigned(name, selectedModel, "local", savedPath.getFileName().toString(), downloaded.signedSkin(), save);
                         refreshLocalSelection(savedPath);
                     } catch (IOException | IllegalArgumentException e) {
                         this.status = e.getMessage();
