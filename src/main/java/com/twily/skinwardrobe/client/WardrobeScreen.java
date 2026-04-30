@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
 
 public final class WardrobeScreen extends Screen {
     private static final Component TITLE = Component.translatable("screen.skinwardrobe.title");
-    private static final long CAROUSEL_ANIMATION_MILLIS = 180L;
+    private static final long CAROUSEL_ANIMATION_MILLIS = 260L;
     private final @Nullable Screen parent;
     private final List<LocalSkinScanner.LocalSkin> localSkins = new ArrayList<>();
     private final List<GallerySkin> gallerySkins = new ArrayList<>();
@@ -42,6 +42,7 @@ public final class WardrobeScreen extends Screen {
     private long animationStartedAt;
     private String status = "";
     private boolean syncRequested;
+    private boolean userChangedSelection;
 
     public WardrobeScreen(@Nullable Screen parent) {
         super(TITLE);
@@ -58,6 +59,7 @@ public final class WardrobeScreen extends Screen {
         this.localSkins.clear();
         this.localSkins.addAll(LocalSkinScanner.scan());
         rebuildGallery();
+        applyInitialActiveSelection();
         clampSelection();
         this.clearWidgets();
 
@@ -127,6 +129,8 @@ public final class WardrobeScreen extends Screen {
 
     public void refreshFromServer() {
         this.status = ClientWardrobeState.lastMessage();
+        rebuildGallery();
+        applyInitialActiveSelection();
         this.rebuildWidgets();
     }
 
@@ -209,6 +213,7 @@ public final class WardrobeScreen extends Screen {
             PreviewSlot slot = animatedSlot(layout, preview.offset());
             preview.widget().setX(slot.x());
             preview.widget().setY(slot.y());
+            preview.widget().setSize(slot.size(), slot.size());
         }
     }
 
@@ -259,7 +264,7 @@ public final class WardrobeScreen extends Screen {
     }
 
     private static int lerp(int from, int to, float progress) {
-        float eased = 1.0F - (1.0F - progress) * (1.0F - progress);
+        float eased = progress * progress * (3.0F - 2.0F * progress);
         return Math.round(from + (to - from) * eased);
     }
 
@@ -307,6 +312,7 @@ public final class WardrobeScreen extends Screen {
         if (this.gallerySkins.isEmpty()) {
             return;
         }
+        this.userChangedSelection = true;
         startAnimation(-1);
         this.selectedIndex = (this.selectedIndex - 1 + this.gallerySkins.size()) % this.gallerySkins.size();
         updateNameFromSelection();
@@ -316,6 +322,7 @@ public final class WardrobeScreen extends Screen {
         if (this.gallerySkins.isEmpty()) {
             return;
         }
+        this.userChangedSelection = true;
         startAnimation(1);
         this.selectedIndex = (this.selectedIndex + 1) % this.gallerySkins.size();
         updateNameFromSelection();
@@ -332,6 +339,38 @@ public final class WardrobeScreen extends Screen {
         if (selected != null && this.nameBox != null) {
             this.nameBox.setValue(selected.name());
         }
+    }
+
+    private void applyInitialActiveSelection() {
+        if (this.userChangedSelection) {
+            return;
+        }
+        WardrobeEntry active = ClientWardrobeState.wardrobe().active;
+        if (active == null) {
+            return;
+        }
+        for (int i = 0; i < this.gallerySkins.size(); i++) {
+            if (matchesActive(this.gallerySkins.get(i), active)) {
+                this.selectedIndex = i;
+                updateNameFromSelection();
+                return;
+            }
+        }
+    }
+
+    private static boolean matchesActive(GallerySkin skin, WardrobeEntry active) {
+        if (skin.saved() != null && equalsText(skin.saved().value, active.value) && equalsText(skin.saved().signature, active.signature)) {
+            return true;
+        }
+        if (skin.local() != null) {
+            String fileName = skin.local().path().getFileName().toString();
+            return equalsText(fileName, active.source) || equalsText(skin.name(), active.name);
+        }
+        return false;
+    }
+
+    private static boolean equalsText(String left, String right) {
+        return left != null && right != null && left.equals(right);
     }
 
     private void applySelected() {

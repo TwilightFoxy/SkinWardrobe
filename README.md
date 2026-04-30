@@ -1,10 +1,33 @@
 # Skin Wardrobe
 
-Skin Wardrobe is a NeoForge 26.1 mod for changing player skins on a server. It works server-side through commands and, when installed on the client too, adds an in-game wardrobe screen.
+Skin Wardrobe is a NeoForge 26.1 mod for changing player skins on a server. It works server-side through commands, and when installed on the client too it adds an in-game wardrobe screen with skin previews.
 
-## Commands
+## English
 
-- `/skinwardrobe seturl <url> [classic|slim]` applies a direct PNG skin URL.
+### What links work?
+
+Skin Wardrobe accepts direct Minecraft skin PNG files sized `64x64`. Public Yandex Disk image links and Ely.by skin pages are supported too, for example links like:
+
+```text
+https://disk.yandex.ru/i/...
+https://ely.by/skins/s3512393
+```
+
+The final image must still be a valid Minecraft skin PNG. If the image is a screenshot, preview image, or a non-`64x64` picture, the mod will reject it.
+
+### Local skins
+
+With the client mod installed, put PNG skin files here:
+
+```text
+.minecraft/skinwardrobe
+```
+
+URL skins applied through the GUI are also downloaded into this folder, so local files and downloaded skins appear in the same carousel.
+
+### Commands
+
+- `/skinwardrobe seturl <url> [classic|slim]` applies a skin URL.
 - `/skinwardrobe saveurl <name> <url> [classic|slim]` signs, applies, and saves a URL skin.
 - `/skinwardrobe use <name>` applies a saved skin.
 - `/skinwardrobe delete <name>` removes a saved skin.
@@ -12,21 +35,42 @@ Skin Wardrobe is a NeoForge 26.1 mod for changing player skins on a server. It w
 - `/skinwardrobe reset` restores the default textures.
 - `/skinwardrobe current` shows the active wardrobe skin.
 
-Only PNG skins sized `64x64` or `64x32` are accepted.
+Skin signing uses the public MineSkin API, so applying new skins depends on that service being available and not rate-limited.
 
-## Client Wardrobe
+## Русский
 
-Press `O` to open the wardrobe screen. Local PNG files are loaded from:
+### Какие ссылки подходят?
+
+Skin Wardrobe принимает ссылки на PNG-скины Minecraft размером `64x64`. Публичные ссылки Яндекс.Диска и страницы скинов Ely.by тоже поддерживаются, например:
 
 ```text
-.minecraft/skinwardrobe/skins
+https://disk.yandex.ru/i/...
+https://ely.by/skins/s3512393
 ```
 
-Local skins are signed through MineSkin and then sent to the server as signed texture data.
+Итоговая картинка должна быть валидным PNG-скином Minecraft. Если это скриншот, превью или картинка не `64x64`, мод ее отклонит.
 
-## Notes
+### Локальные скины
 
-Skin signing uses the public MineSkin API, so applying new skins depends on that service being available and not rate-limited.
+Если мод установлен на клиенте, закидывай PNG-скины сюда:
+
+```text
+.minecraft/skinwardrobe
+```
+
+Скины, примененные по ссылке через GUI, тоже скачиваются в эту папку. Поэтому вручную добавленные и скачанные скины отображаются в одной карусели.
+
+### Команды
+
+- `/skinwardrobe seturl <url> [classic|slim]` применяет скин по ссылке.
+- `/skinwardrobe saveurl <name> <url> [classic|slim]` подписывает, применяет и сохраняет скин по ссылке.
+- `/skinwardrobe use <name>` применяет сохраненный скин.
+- `/skinwardrobe delete <name>` удаляет сохраненный скин.
+- `/skinwardrobe list` показывает список сохраненных скинов.
+- `/skinwardrobe reset` возвращает стандартный скин.
+- `/skinwardrobe current` показывает текущий активный скин.
+
+Подпись скинов идет через публичный API MineSkin, поэтому применение новых скинов зависит от доступности MineSkin и его лимитов.
 
 ## Versioning
 
