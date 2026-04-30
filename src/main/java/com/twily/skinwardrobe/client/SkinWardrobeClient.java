@@ -21,6 +21,7 @@ public final class SkinWardrobeClient {
             InputConstants.Type.KEYSYM,
             InputConstants.KEY_O,
             CATEGORY);
+    private static boolean localFolderChecked;
 
     private SkinWardrobeClient() {
     }
@@ -35,6 +36,7 @@ public final class SkinWardrobeClient {
     public static void registerClientPayloads(RegisterClientPayloadHandlersEvent event) {
         event.register(WardrobeSyncPayload.TYPE, (payload, context) -> {
             ClientWardrobeState.update(payload.json(), payload.message());
+            ClientSkinCacheRefresher.refreshAll();
             if (Minecraft.getInstance().screen instanceof WardrobeScreen screen) {
                 screen.refreshFromServer();
             }
@@ -44,6 +46,10 @@ public final class SkinWardrobeClient {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
+        if (!localFolderChecked) {
+            localFolderChecked = true;
+            LocalSkinScanner.ensureSkinsDirectory();
+        }
         while (OPEN_WARDROBE.consumeClick()) {
             if (minecraft.player != null && minecraft.screen == null) {
                 minecraft.setScreen(new WardrobeScreen(null));

@@ -21,13 +21,23 @@ public final class LocalSkinScanner {
     }
 
     public static Path skinsDirectory() {
-        return Minecraft.getInstance().gameDirectory.toPath().resolve("skinwardrobe").resolve("skins");
+        return Minecraft.getInstance().gameDirectory.toPath().resolve("skinwardrobe").resolve("skins").toAbsolutePath().normalize();
+    }
+
+    public static void ensureSkinsDirectory() {
+        Path directory = skinsDirectory();
+        try {
+            Files.createDirectories(directory);
+            SkinWardrobe.LOGGER.info("Local Skin Wardrobe folder: {}", directory);
+        } catch (IOException e) {
+            SkinWardrobe.LOGGER.warn("Could not create local skin folder {}", directory, e);
+        }
     }
 
     public static List<LocalSkin> scan() {
         Path directory = skinsDirectory();
         try {
-            Files.createDirectories(directory);
+            ensureSkinsDirectory();
             List<LocalSkin> result = new ArrayList<>();
             try (var stream = Files.list(directory)) {
                 for (Path path : stream

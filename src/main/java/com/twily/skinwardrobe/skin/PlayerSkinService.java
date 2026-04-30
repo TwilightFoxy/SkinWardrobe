@@ -18,14 +18,19 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerPlayer;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 
 public final class PlayerSkinService {
     private static final String DEFAULT_TEXTURES_KEY = "skinwardrobe-default_textures";
     private static final Map<UUID, Long> LAST_SIGNED_APPLY = new ConcurrentHashMap<>();
     private static final long RATE_LIMIT_MILLIS = 15_000L;
     private static final Field GAME_PROFILE_FIELD = findGameProfileField();
+    private static final Field CHUNK_MAP_ENTITY_MAP = findField(ChunkMap.class, "entityMap");
+    private static final Field TRACKED_ENTITY_SERVER_ENTITY = findTrackedEntityServerEntityField();
 
     private PlayerSkinService() {
     }
@@ -167,15 +172,38 @@ public final class PlayerSkinService {
 
     private static void refreshPlayer(ServerPlayer player) {
         for (ServerPlayer other : player.level().getServer().getPlayerList().getPlayers()) {
-            if (other == player) {
-                continue;
-            }
             other.connection.send(new ClientboundPlayerInfoRemovePacket(Collections.singletonList(player.getUUID())));
             other.connection.send(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(Collections.singleton(player)));
         }
 
         if (player.level().getChunkSource() instanceof ServerChunkCache chunkCache) {
             chunkCache.move(player);
+            refreshEntityPairings(player, chunkCache);
+        }
+    }
+
+    private static void refreshEntityPairings(ServerPlayer player, ServerChunkCache chunkCache) {
+        if (CHUNK_MAP_ENTITY_MAP == null || TRACKED_ENTITY_SERVER_ENTITY == null) {
+            return;
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Int2ObjectMap<Object> entityMap = (Int2ObjectMap<Object>) CHUNK_MAP_ENTITY_MAP.get(chunkCache.chunkMap);
+            Object trackedEntity = entityMap.get(player.getId());
+            if (trackedEntity == null) {
+                return;
+            }
+            ServerEntity serverEntity = (ServerEntity) TRACKED_ENTITY_SERVER_ENTITY.get(trackedEntity);
+            for (ServerPlayer watcher : chunkCache.chunkMap.getPlayersWatching(player)) {
+                if (watcher == player) {
+                    continue;
+                }
+                serverEntity.removePairing(watcher);
+                serverEntity.addPairing(watcher);
+            }
+        } catch (IllegalAccessException | ClassCastException e) {
+            SkinWardrobe.LOGGER.warn("Could not refresh player entity pairing for skin update", e);
         }
     }
 
@@ -215,5 +243,29 @@ public final class PlayerSkinService {
         } catch (NoSuchFieldException e) {
             throw new IllegalStateException("Could not find Player.gameProfile", e);
         }
+    }
+
+    private static Field findField(Class<?> owner, String name) {
+        try {
+            Field field = owner.getDeclaredField(name);
+            field.setAccessible(true);
+            return field;
+        } catch (NoSuchFieldException e) {
+            SkinWardrobe.LOGGER.warn("Could not find {}.{}", owner.getName(), name);
+            return null;
+        }
+    }
+
+    private static Field findTrackedEntityServerEntityField() {
+        for (Class<?> nested : ChunkMap.class.getDeclaredClasses()) {
+            for (Field field : nested.getDeclaredFields()) {
+                if (field.getType() == ServerEntity.class) {
+                    field.setAccessible(true);
+                    return field;
+                }
+            }
+        }
+        SkinWardrobe.LOGGER.warn("Could not find ChunkMap tracked ServerEntity field");
+        return null;
     }
 }

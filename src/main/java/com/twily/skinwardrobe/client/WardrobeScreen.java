@@ -32,6 +32,7 @@ public final class WardrobeScreen extends Screen {
     private @Nullable LocalSkinScanner.LocalSkin selectedLocal;
     private @Nullable String selectedSavedName;
     private String status = "";
+    private boolean syncRequested;
 
     public WardrobeScreen(@Nullable Screen parent) {
         super(TITLE);
@@ -40,10 +41,14 @@ public final class WardrobeScreen extends Screen {
 
     @Override
     protected void init() {
+        String urlValue = this.urlBox == null ? "" : this.urlBox.getValue();
+        String nameValue = this.nameBox == null ? "" : this.nameBox.getValue();
+        boolean urlFocused = this.urlBox != null && this.urlBox.isFocused();
+        boolean nameFocused = this.nameBox != null && this.nameBox.isFocused();
+
         this.localSkins.clear();
         this.localSkins.addAll(LocalSkinScanner.scan());
         this.clearWidgets();
-        send("request_sync", "{}");
 
         int panelWidth = Math.min(520, this.width - 32);
         int left = (this.width - panelWidth) / 2;
@@ -52,11 +57,13 @@ public final class WardrobeScreen extends Screen {
 
         this.urlBox = new EditBox(this.font, left + 14, top + 34, fieldWidth, 20, Component.translatable("screen.skinwardrobe.url"));
         this.urlBox.setMaxLength(2048);
+        this.urlBox.setValue(urlValue);
         this.urlBox.setHint(Component.translatable("screen.skinwardrobe.url.hint"));
         this.addRenderableWidget(this.urlBox);
 
         this.nameBox = new EditBox(this.font, left + 14, top + 62, fieldWidth, 20, Component.translatable("screen.skinwardrobe.name"));
         this.nameBox.setMaxLength(32);
+        this.nameBox.setValue(nameValue);
         this.nameBox.setHint(Component.translatable("screen.skinwardrobe.name.hint"));
         this.addRenderableWidget(this.nameBox);
 
@@ -80,6 +87,19 @@ public final class WardrobeScreen extends Screen {
 
         addSavedButtons(left + 14, top + 112, 210);
         addLocalButtons(left + panelWidth - 224, top + 112, 210);
+
+        if (urlFocused) {
+            this.setFocused(this.urlBox);
+            this.urlBox.setFocused(true);
+        } else if (nameFocused) {
+            this.setFocused(this.nameBox);
+            this.nameBox.setFocused(true);
+        }
+
+        if (!this.syncRequested) {
+            this.syncRequested = true;
+            send("request_sync", "{}");
+        }
     }
 
     public void refreshFromServer() {
