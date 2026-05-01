@@ -1,6 +1,7 @@
 package com.twily.skinwardrobe.client;
 
 import com.google.gson.JsonObject;
+import com.twily.skinwardrobe.SkinWardrobe;
 import com.twily.skinwardrobe.network.SkinWardrobeCommandPayload;
 import com.twily.skinwardrobe.skin.MineSkinClient;
 import com.twily.skinwardrobe.skin.SignedSkin;
@@ -480,7 +481,7 @@ public final class WardrobeScreen extends Screen {
     }
 
     private PlayerSkin previewSkinAtOffset(int offset) {
-        GallerySkin selected = selectedAtOffset(offset);
+        GallerySkin selected = previewAtOffset(offset);
         return selected == null ? DefaultPlayerSkin.getDefaultSkin() : selected.preview().get();
     }
 
@@ -489,11 +490,18 @@ public final class WardrobeScreen extends Screen {
     }
 
     private @Nullable GallerySkin selectedAtOffset(int offset) {
+        return skinAtOffset(this.selectedIndex, offset);
+    }
+
+    private @Nullable GallerySkin previewAtOffset(int offset) {
+        return skinAtOffset(isAnimating() ? this.animationFromIndex : this.selectedIndex, offset);
+    }
+
+    private @Nullable GallerySkin skinAtOffset(int baseIndex, int offset) {
         if (this.gallerySkins.isEmpty()) {
             return null;
         }
         clampSelection();
-        int baseIndex = isAnimating() ? this.animationFromIndex : this.selectedIndex;
         int index = Math.floorMod(baseIndex + offset, this.gallerySkins.size());
         return this.gallerySkins.get(index);
     }
@@ -528,7 +536,11 @@ public final class WardrobeScreen extends Screen {
 
     private static void send(String action, String json) {
         if (Minecraft.getInstance().getConnection() != null) {
-            ClientPacketDistributor.sendToServer(new SkinWardrobeCommandPayload(action, json));
+            try {
+                ClientPacketDistributor.sendToServer(new SkinWardrobeCommandPayload(action, json));
+            } catch (UnsupportedOperationException e) {
+                SkinWardrobe.LOGGER.warn("Skin Wardrobe server channel is not available for action {}", action);
+            }
         }
     }
 

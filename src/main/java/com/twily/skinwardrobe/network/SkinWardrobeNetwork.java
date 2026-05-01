@@ -9,10 +9,13 @@ import com.twily.skinwardrobe.skin.SkinModel;
 import com.twily.skinwardrobe.storage.WardrobeEntry;
 import com.twily.skinwardrobe.storage.WardrobeStorage;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.common.extensions.ICommonPacketListener;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
 public final class SkinWardrobeNetwork {
     private static final Gson GSON = new Gson();
@@ -27,6 +30,10 @@ public final class SkinWardrobeNetwork {
     }
 
     public static void sync(ServerPlayer player) {
+        if (player.connection == null
+                || !NetworkRegistry.hasChannel(((ICommonPacketListener) player.connection).getConnection(), ConnectionProtocol.PLAY, WardrobeSyncPayload.TYPE.id())) {
+            return;
+        }
         PacketDistributor.sendToPlayer(player, new WardrobeSyncPayload(WardrobeStorage.toClientJson(player.level().getServer(), player.getUUID()), ""));
     }
 

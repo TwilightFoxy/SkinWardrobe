@@ -36,7 +36,7 @@ public final class SkinWardrobeClient {
     public static void registerClientPayloads(RegisterClientPayloadHandlersEvent event) {
         event.register(WardrobeSyncPayload.TYPE, (payload, context) -> {
             ClientWardrobeState.update(payload.json(), payload.message());
-            ClientSkinCacheRefresher.refreshAll();
+            ClientSkinCacheRefresher.refreshAllWithRetry();
             if (Minecraft.getInstance().screen instanceof WardrobeScreen screen) {
                 screen.refreshFromServer();
             }

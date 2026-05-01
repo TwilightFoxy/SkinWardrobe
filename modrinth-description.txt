@@ -1,0 +1,123 @@
+# Skin Wardrobe
+
+**Skin Wardrobe** — мод для NeoForge, который позволяет менять скин прямо в игре без перезахода.
+Основная часть работает на сервере через команды, а если мод установлен на клиенте, появляется удобное меню гардероба с 3D-предпросмотром.
+
+## Как установить скин
+
+### Через меню
+
+Установи мод на клиент и сервер, зайди в игру и нажми `O`.
+
+В меню можно:
+- вставить ссылку на скин;
+- выбрать модель `Classic` или `Slim`;
+- применить скин;
+- сохранить скин в гардероб;
+- листать сохраненные и локальные скины в карусели.
+
+Локальные PNG-скины можно положить в папку:
+
+```text
+.minecraft/skinwardrobe
+```
+
+### Через команды
+
+Если мод стоит только на сервере, игроки могут пользоваться командами:
+
+```text
+/skinwardrobe seturl <url> [classic|slim]
+/skinwardrobe saveurl <name> <url> [classic|slim]
+/skinwardrobe use <name>
+/skinwardrobe list
+/skinwardrobe delete <name>
+/skinwardrobe reset
+```
+
+## Важно про установку на клиент
+
+Если мод установлен только на сервере, игроки без клиентского мода могут менять скины через команды. Другие игроки увидят новый скин сразу, а сам игрок увидит его после повторного входа на сервер.
+
+Если мод установлен и на клиенте, игрок получает меню гардероба по клавише `O`, 3D-предпросмотр и мгновенное обновление собственного скина без перезахода.
+
+## Поддерживаемые ссылки
+
+Скин должен быть PNG `64x64`.
+
+Поддерживаются:
+- прямые PNG-ссылки;
+- публичные ссылки Яндекс.Диска;
+- страницы Ely.by;
+- страницы NameMC.
+
+Примеры:
+
+```text
+https://disk.yandex.ru/i/...
+https://ely.by/skins/s3512393
+https://namemc.com/skin/6e8a6d2c80f9e54b
+```
+
+---
+
+# Skin Wardrobe
+
+**Skin Wardrobe** is a NeoForge mod that lets players change Minecraft skins in-game without reconnecting.
+The core functionality runs on the server through commands, and when installed on the client it adds a wardrobe GUI with 3D skin previews.
+
+## How to install a skin
+
+### Using the GUI
+
+Install the mod on both the server and client, join the game, and press `O`.
+
+The GUI lets you:
+- paste a skin URL;
+- choose `Classic` or `Slim`;
+- apply a skin;
+- save a skin to your wardrobe;
+- browse saved and local skins in a carousel.
+
+Local PNG skins can be placed here:
+
+```text
+.minecraft/skinwardrobe
+```
+
+### Using commands
+
+If the mod is installed only on the server, players can use commands:
+
+```text
+/skinwardrobe seturl <url> [classic|slim]
+/skinwardrobe saveurl <name> <url> [classic|slim]
+/skinwardrobe use <name>
+/skinwardrobe list
+/skinwardrobe delete <name>
+/skinwardrobe reset
+```
+
+## Client Installation Note
+
+If the mod is installed only on the server, players without the client mod can still change skins through commands. Other players will see the new skin immediately, while the player who changed it will see it after rejoining the server.
+
+If the mod is also installed on the client, the player gets the wardrobe GUI on the `O` key, 3D previews, and instant self-skin refresh without reconnecting.
+
+## Supported links
+
+The skin must be a `64x64` PNG.
+
+Supported sources:
+- direct PNG links;
+- public Yandex Disk links;
+- Ely.by skin pages;
+- NameMC skin pages.
+
+Examples:
+
+```text
+https://disk.yandex.ru/i/...
+https://ely.by/skins/s3512393
+https://namemc.com/skin/6e8a6d2c80f9e54b
+```

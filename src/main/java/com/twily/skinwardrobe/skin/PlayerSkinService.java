@@ -11,8 +11,12 @@ import com.twily.skinwardrobe.storage.WardrobeEntry;
 import com.twily.skinwardrobe.storage.WardrobeStorage;
 import java.lang.reflect.Field;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
@@ -28,6 +32,7 @@ public final class PlayerSkinService {
     private static final String DEFAULT_TEXTURES_KEY = "skinwardrobe-default_textures";
     private static final Map<UUID, Long> LAST_SIGNED_APPLY = new ConcurrentHashMap<>();
     private static final long RATE_LIMIT_MILLIS = 3_000L;
+    private static final long LOGIN_APPLY_DELAY_MILLIS = 500L;
     private static final Field GAME_PROFILE_FIELD = findGameProfileField();
     private static final Field CHUNK_MAP_ENTITY_MAP = findField(ChunkMap.class, "entityMap");
     private static final Field TRACKED_ENTITY_SERVER_ENTITY = findTrackedEntityServerEntityField();
@@ -101,12 +106,31 @@ public final class PlayerSkinService {
         player.sendSystemMessage(Component.translatable("skinwardrobe.status.reset"));
     }
 
+    public static void prepareActiveForLogin(ServerPlayer player) {
+        PlayerWardrobe wardrobe = WardrobeStorage.get(player.level().getServer(), player.getUUID());
+        if (wardrobe.active == null || !wardrobe.active.signedSkin().isComplete()) {
+            return;
+        }
+
+        applySignedSkin(player, wardrobe.active.signedSkin(), false);
+    }
+
     public static void applyActiveOnLogin(ServerPlayer player) {
         PlayerWardrobe wardrobe = WardrobeStorage.get(player.level().getServer(), player.getUUID());
-        if (wardrobe.active != null && wardrobe.active.signedSkin().isComplete()) {
-            applySignedSkin(player, wardrobe.active.signedSkin());
-            SkinWardrobeNetwork.sync(player);
+        if (wardrobe.active == null || !wardrobe.active.signedSkin().isComplete()) {
+            return;
         }
+
+        MinecraftServer server = player.level().getServer();
+        UUID playerId = player.getUUID();
+        CompletableFuture.delayedExecutor(LOGIN_APPLY_DELAY_MILLIS, TimeUnit.MILLISECONDS).execute(() ->
+                server.executeIfPossible(() -> {
+                    ServerPlayer onlinePlayer = server.getPlayerList().getPlayer(playerId);
+                    if (onlinePlayer != null) {
+                        refreshPlayer(onlinePlayer);
+                        SkinWardrobeNetwork.sync(onlinePlayer);
+                    }
+                }));
     }
 
     public static void sendCurrent(ServerPlayer player) {
@@ -150,6 +174,10 @@ public final class PlayerSkinService {
     }
 
     private static void applySignedSkin(ServerPlayer player, SignedSkin signedSkin) {
+        applySignedSkin(player, signedSkin, true);
+    }
+
+    private static void applySignedSkin(ServerPlayer player, SignedSkin signedSkin, boolean refresh) {
         var properties = ArrayListMultimap.create(player.getGameProfile().properties());
         if (!properties.containsKey(DEFAULT_TEXTURES_KEY) && properties.containsKey("textures")) {
             Property original = properties.get("textures").stream().findFirst().orElse(null);
@@ -167,7 +195,9 @@ public final class PlayerSkinService {
         }
 
         setProfile(player, new GameProfile(player.getUUID(), player.getGameProfile().name(), new PropertyMap(properties)));
-        refreshPlayer(player);
+        if (refresh) {
+            refreshPlayer(player);
+        }
     }
 
     private static void refreshPlayer(ServerPlayer player) {
@@ -195,13 +225,24 @@ public final class PlayerSkinService {
                 return;
             }
             ServerEntity serverEntity = (ServerEntity) TRACKED_ENTITY_SERVER_ENTITY.get(trackedEntity);
-            for (ServerPlayer watcher : chunkCache.chunkMap.getPlayersWatching(player)) {
-                if (watcher == player) {
-                    continue;
+            Set<ServerPlayer> watchers = new LinkedHashSet<>(chunkCache.chunkMap.getPlayersWatching(player));
+            watchers.remove(player);
+            for (ServerPlayer watcher : player.level().getServer().getPlayerList().getPlayers()) {
+                if (watcher != player && watcher.level() == player.level() && player.broadcastToPlayer(watcher)) {
+                    watchers.add(watcher);
                 }
-                serverEntity.removePairing(watcher);
-                serverEntity.addPairing(watcher);
             }
+            for (ServerPlayer watcher : watchers) {
+                serverEntity.removePairing(watcher);
+            }
+            CompletableFuture.delayedExecutor(100L, TimeUnit.MILLISECONDS).execute(() ->
+                    player.level().getServer().executeIfPossible(() -> {
+                        for (ServerPlayer watcher : watchers) {
+                            if (watcher.connection != null && watcher.level() == player.level() && player.broadcastToPlayer(watcher)) {
+                                serverEntity.addPairing(watcher);
+                            }
+                        }
+                    }));
         } catch (IllegalAccessException | ClassCastException e) {
             SkinWardrobe.LOGGER.warn("Could not refresh player entity pairing for skin update", e);
         }

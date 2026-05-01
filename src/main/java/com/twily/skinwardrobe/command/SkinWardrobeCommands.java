@@ -6,6 +6,7 @@ import com.twily.skinwardrobe.skin.SkinModel;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
@@ -69,6 +70,13 @@ public final class SkinWardrobeCommands {
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             PlayerSkinService.applyActiveOnLogin(player);
+        }
+    }
+
+    public static void onDatapackSync(OnDatapackSyncEvent event) {
+        ServerPlayer player = event.getPlayer();
+        if (player != null) {
+            PlayerSkinService.prepareActiveForLogin(player);
         }
     }
 

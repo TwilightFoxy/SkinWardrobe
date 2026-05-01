@@ -17,6 +17,7 @@ public final class SkinWardrobe {
     public SkinWardrobe(IEventBus modBus, ModContainer modContainer) {
         modBus.addListener(SkinWardrobeNetwork::registerPayloads);
         NeoForge.EVENT_BUS.addListener(SkinWardrobeCommands::register);
+        NeoForge.EVENT_BUS.addListener(SkinWardrobeCommands::onDatapackSync);
         NeoForge.EVENT_BUS.addListener(SkinWardrobeCommands::onPlayerLoggedIn);
     }
 }
