@@ -9,6 +9,7 @@ import com.twily.skinwardrobe.skin.SkinDownloader;
 import com.twily.skinwardrobe.skin.SkinModel;
 import com.twily.skinwardrobe.storage.WardrobeEntry;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,11 +88,8 @@ public final class WardrobeScreen extends Screen {
                     this.rebuildWidgets();
                 }));
 
-        this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.apply_url"), button -> applyUrl(false))
-                .bounds(layout.left + layout.panelWidth - 168, layout.top + 62, 76, 20)
-                .build());
         this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.save_url"), button -> applyUrl(true))
-                .bounds(layout.left + layout.panelWidth - 88, layout.top + 62, 74, 20)
+                .bounds(layout.left + layout.panelWidth - 168, layout.top + 62, 154, 20)
                 .build());
 
         addCarouselWidgets(layout);
@@ -105,7 +103,7 @@ public final class WardrobeScreen extends Screen {
         Button delete = this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.delete"), button -> deleteSelected())
                 .bounds(layout.centerX + 4, actionY, 62, 20)
                 .build());
-        delete.active = selected() != null && selected().saved() != null;
+        delete.active = selected() != null && (selected().saved() != null || selected().local() != null);
 
         this.addRenderableWidget(Button.builder(Component.translatable("screen.skinwardrobe.reset"), button -> send("reset", "{}"))
                 .bounds(layout.left + layout.panelWidth - 168, layout.bottom - 28, 76, 20)
@@ -334,7 +332,6 @@ public final class WardrobeScreen extends Screen {
         this.userChangedSelection = true;
         startAnimation(-1);
         this.selectedIndex = (this.selectedIndex - 1 + this.gallerySkins.size()) % this.gallerySkins.size();
-        updateNameFromSelection();
     }
 
     private void selectNext() {
@@ -344,20 +341,12 @@ public final class WardrobeScreen extends Screen {
         this.userChangedSelection = true;
         startAnimation(1);
         this.selectedIndex = (this.selectedIndex + 1) % this.gallerySkins.size();
-        updateNameFromSelection();
     }
 
     private void startAnimation(int direction) {
         this.animationFromIndex = this.selectedIndex;
         this.animationDirection = direction;
         this.animationStartedAt = System.currentTimeMillis();
-    }
-
-    private void updateNameFromSelection() {
-        GallerySkin selected = selected();
-        if (selected != null && this.nameBox != null) {
-            this.nameBox.setValue(selected.name());
-        }
     }
 
     private void applyInitialActiveSelection() {
@@ -371,7 +360,6 @@ public final class WardrobeScreen extends Screen {
         for (int i = 0; i < this.gallerySkins.size(); i++) {
             if (matchesActive(this.gallerySkins.get(i), active)) {
                 this.selectedIndex = i;
-                updateNameFromSelection();
                 return;
             }
         }
@@ -406,9 +394,40 @@ public final class WardrobeScreen extends Screen {
 
     private void deleteSelected() {
         GallerySkin selected = selected();
-        if (selected != null && selected.saved() != null) {
-            send("delete", nameJson(selected.saved().name));
+        if (selected == null) {
+            return;
         }
+        if (selected.saved() != null) {
+            send("delete", nameJson(selected.saved().name));
+        } else if (selected.local() != null) {
+            deleteLocal(selected.local());
+        }
+    }
+
+    private void deleteLocal(LocalSkinScanner.LocalSkin skin) {
+        try {
+            Files.deleteIfExists(skin.path());
+            WardrobeEntry saved = findSavedForLocal(skin);
+            if (saved != null) {
+                send("delete", nameJson(saved.name));
+            }
+            this.status = Component.translatable("skinwardrobe.status.deleted", skin.name()).getString();
+            refreshLocalGallery();
+        } catch (IOException e) {
+            this.status = e.getMessage();
+        }
+    }
+
+    private WardrobeEntry findSavedForLocal(LocalSkinScanner.LocalSkin skin) {
+        String fileName = skin.path().getFileName().toString();
+        for (WardrobeEntry entry : ClientWardrobeState.wardrobe().entries.values()) {
+            if (entry.sourceType != null
+                    && (entry.sourceType.equals("local") || entry.sourceType.equals("url"))
+                    && equalsText(fileName, entry.source)) {
+                return entry;
+            }
+        }
+        return null;
     }
 
     private void applyUrl(boolean save) {
@@ -472,12 +491,15 @@ public final class WardrobeScreen extends Screen {
                 break;
             }
         }
-        updateNameFromSelection();
         this.rebuildWidgets();
     }
 
-    private PlayerSkin selectedPreviewSkin() {
-        return previewSkinAtOffset(0);
+    private void refreshLocalGallery() {
+        this.localSkins.clear();
+        this.localSkins.addAll(LocalSkinScanner.scan());
+        rebuildGallery();
+        clampSelection();
+        this.rebuildWidgets();
     }
 
     private PlayerSkin previewSkinAtOffset(int offset) {
